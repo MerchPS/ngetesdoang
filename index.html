@@ -257,7 +257,7 @@
             document.getElementById(viewId).classList.remove('hidden');
         }
 
-        // 1. Load Halaman Utama (Ongoing Anime)
+        // 1. Load Halaman Utama (Mengambil data dari /home)
         async function loadHome() {
             showView('homeView');
             showLoader(true);
@@ -265,14 +265,23 @@
             homeTitle.innerText = "Anime Sedang Tayang";
             
             try {
-                const response = await fetch(`${BASE_URL}/ongoing-anime`);
+                // Menggunakan endpoint /home karena struktur JSON-nya ada di sana
+                const response = await fetch(`${BASE_URL}/home`);
                 const result = await response.json();
                 
-                // CATATAN: Struktur object 'result' bisa berbeda tergantung respon asli API.
-                // Asumsi standar API biasanya melempar { status: true, data: [...] }
-                const animeData = result.data || result; 
+                // Menyesuaikan struktur JSON: data -> ongoing -> animeList
+                let animeData = [];
+                if (result.data && result.data.ongoing && result.data.ongoing.animeList) {
+                    animeData = result.data.ongoing.animeList;
+                } else if (result.data && result.data.animeList) {
+                    animeData = result.data.animeList;
+                } else {
+                    animeData = result.data || [];
+                }
+                
                 renderGrid(animeData);
             } catch (error) {
+                console.error("Fetch Error:", error);
                 animeGrid.innerHTML = '<p>Gagal memuat data. Periksa koneksi atau API.</p>';
             } finally {
                 showLoader(false);
@@ -292,9 +301,18 @@
             try {
                 const response = await fetch(`${BASE_URL}/search/${encodeURIComponent(keyword)}`);
                 const result = await response.json();
-                const animeData = result.data || result;
+                
+                // Antisipasi struktur pencarian yang mengembalikan animeList
+                let animeData = [];
+                if (result.data && result.data.animeList) {
+                    animeData = result.data.animeList;
+                } else {
+                    animeData = result.data || [];
+                }
+
                 renderGrid(animeData);
             } catch (error) {
+                console.error("Search Error:", error);
                 animeGrid.innerHTML = '<p>Gagal melakukan pencarian.</p>';
             } finally {
                 showLoader(false);
@@ -303,27 +321,33 @@
 
         // Render Grid Anime (Untuk Home & Search)
         function renderGrid(dataList) {
-            if (!dataList || dataList.length === 0) {
+            if (!dataList || !Array.isArray(dataList) || dataList.length === 0) {
                 animeGrid.innerHTML = '<p>Anime tidak ditemukan.</p>';
                 return;
             }
 
-            animeGrid.innerHTML = dataList.map(anime => `
-                <div class="anime-card" onclick="loadDetail('${anime.slug || anime.endpoint}')">
-                    <img src="${anime.poster || anime.thumb || 'https://via.placeholder.com/200x300?text=No+Image'}" alt="${anime.title}">
+            animeGrid.innerHTML = dataList.map(anime => {
+                // Gunakan animeId dari JSON
+                const id = anime.animeId || anime.slug || anime.endpoint || '';
+                const infoText = anime.latestReleaseDate ? `Update: ${anime.latestReleaseDate}` : (anime.score ? `Score: ${anime.score}` : `Eps: ${anime.episodes}`);
+                
+                return `
+                <div class="anime-card" onclick="loadDetail('${id}')">
+                    <img src="${anime.poster || 'https://via.placeholder.com/200x300?text=No+Image'}" alt="${anime.title}">
                     <div class="anime-info">
                         <h3>${anime.title}</h3>
-                        <p style="font-size: 12px; color: var(--text-muted);">${anime.status || anime.episode || ''}</p>
+                        <p style="font-size: 12px; color: var(--text-muted);">${infoText}</p>
                     </div>
                 </div>
-            `).join('');
+                `;
+            }).join('');
         }
 
         // 3. Load Detail Anime
-        async function loadDetail(slug) {
-            if(!slug) return;
+        async function loadDetail(animeId) {
+            if(!animeId) return;
             
-            currentAnimeSlug = slug; // Simpan untuk tombol kembali dari player
+            currentAnimeSlug = animeId; 
             showView('detailView');
             showLoader(true);
             
@@ -333,39 +357,41 @@
             episodeList.innerHTML = '';
 
             try {
-                // Hapus awalan '/' jika ada di slug API
-                const cleanSlug = slug.replace(/^\//, ''); 
-                const response = await fetch(`${BASE_URL}/anime/${cleanSlug}`);
+                const response = await fetch(`${BASE_URL}/anime/${animeId}`);
                 const result = await response.json();
                 const anime = result.data || result;
 
                 detailContainer.innerHTML = `
                     <div class="detail-poster">
-                        <img src="${anime.poster || anime.thumb}" alt="${anime.title}">
+                        <img src="${anime.poster}" alt="${anime.title}">
                     </div>
                     <div class="detail-info">
                         <h2>${anime.title}</h2>
                         <p><strong>Status:</strong> ${anime.status || '-'}</p>
-                        <p><strong>Genre:</strong> ${anime.genre || '-'}</p>
-                        <p><strong>Rating:</strong> ${anime.rating || '-'}</p>
+                        <p><strong>Genre:</strong> ${anime.genre || anime.genres || '-'}</p>
+                        <p><strong>Rating:</strong> ${anime.rating || anime.score || '-'}</p>
                         <br>
-                        <p><strong>Sinopsis:</strong><br>${anime.synopsis || anime.deskripsi || 'Tidak ada sinopsis.'}</p>
+                        <p><strong>Sinopsis:</strong><br>${anime.synopsis || 'Tidak ada sinopsis.'}</p>
                     </div>
                 `;
 
-                // Render Episodes
-                const episodes = anime.episodes || anime.episode_list || [];
+                // Cek array episodeList dari detail
+                const episodes = anime.episodeList || anime.episodes || [];
                 if (episodes.length > 0) {
-                    episodeList.innerHTML = episodes.map(ep => `
-                        <div class="episode-btn" onclick="loadPlayer('${ep.slug || ep.endpoint}', '${ep.title}')">
+                    episodeList.innerHTML = episodes.map(ep => {
+                        const epId = ep.episodeId || ep.slug || ep.endpoint;
+                        return `
+                        <div class="episode-btn" onclick="loadPlayer('${epId}', '${ep.title || ep.episode}')">
                             ${ep.title || ep.episode}
                         </div>
-                    `).join('');
+                        `;
+                    }).join('');
                 } else {
                     episodeList.innerHTML = '<p>Belum ada episode.</p>';
                 }
 
             } catch (error) {
+                console.error("Detail Error:", error);
                 detailContainer.innerHTML = '<p>Gagal memuat detail anime.</p>';
             } finally {
                 showLoader(false);
@@ -373,8 +399,8 @@
         }
 
         // 4. Load Player (Nonton Episode)
-        async function loadPlayer(slug, title) {
-            if(!slug) return;
+        async function loadPlayer(episodeId, title) {
+            if(!episodeId) return;
             
             showView('playerView');
             showLoader(true);
@@ -387,13 +413,12 @@
             document.getElementById('backToDetailBtn').onclick = () => loadDetail(currentAnimeSlug);
 
             try {
-                const cleanSlug = slug.replace(/^\//, '');
-                const response = await fetch(`${BASE_URL}/episode/${cleanSlug}`);
+                const response = await fetch(`${BASE_URL}/episode/${episodeId}`);
                 const result = await response.json();
                 const episodeData = result.data || result;
 
-                // Cek apakah API memberikan link iframe (embed) atau link streaming langsung
-                const streamUrl = episodeData.stream_url || episodeData.iframe || episodeData.videoUrl;
+                // Asumsi key untuk url video adalah streamUrl atau iframeUrl
+                const streamUrl = episodeData.streamUrl || episodeData.iframe || episodeData.videoUrl || episodeData.stream_url;
 
                 if (streamUrl) {
                     videoContainer.innerHTML = `<iframe src="${streamUrl}" allowfullscreen="true" scrolling="no"></iframe>`;
@@ -402,6 +427,7 @@
                 }
 
             } catch (error) {
+                console.error("Player Error:", error);
                 videoContainer.innerHTML = '<p>Gagal memuat video.</p>';
             } finally {
                 showLoader(false);
