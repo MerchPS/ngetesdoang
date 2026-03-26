@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Anime Stream - Nonton Anime Terupdate</title>
+    <style>
+        /* --- CSS (Styling) --- */
+        :root {
+            --bg-color: #121212;
+            --card-bg: #1e1e1e;
+            --primary-color: #e50914;
+            --text-light: #f5f5f5;
+            --text-muted: #aaaaaa;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-light);
+            line-height: 1.6;
+        }
+
+        /* Navbar */
+        header {
+            background-color: var(--card-bg);
+            padding: 15px 5%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        header h1 {
+            color: var(--primary-color);
+            cursor: pointer;
+            font-size: 24px;
+        }
+
+        .search-container {
+            display: flex;
+            gap: 10px;
+        }
+
+        .search-container input {
+            padding: 8px 15px;
+            border-radius: 20px;
+            border: none;
+            outline: none;
+            background-color: #333;
+            color: white;
+            width: 250px;
+        }
+
+        .search-container button {
+            padding: 8px 15px;
+            border-radius: 20px;
+            border: none;
+            background-color: var(--primary-color);
+            color: white;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        /* Container & Grid */
+        main {
+            padding: 20px 5%;
+            min-height: 80vh;
+        }
+
+        .section-title {
+            margin-bottom: 20px;
+            font-size: 22px;
+            border-left: 4px solid var(--primary-color);
+            padding-left: 10px;
+        }
+
+        .anime-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 20px;
+        }
+
+        .anime-card {
+            background-color: var(--card-bg);
+            border-radius: 10px;
+            overflow: hidden;
+            cursor: pointer;
+            transition: transform 0.3s ease;
+        }
+
+        .anime-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .anime-card img {
+            width: 100%;
+            height: 280px;
+            object-fit: cover;
+        }
+
+        .anime-info {
+            padding: 10px;
+        }
+
+        .anime-info h3 {
+            font-size: 14px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin-bottom: 5px;
+        }
+
+        /* Detail View */
+        .detail-container {
+            display: flex;
+            gap: 30px;
+            background-color: var(--card-bg);
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+        }
+
+        .detail-poster img {
+            max-width: 250px;
+            border-radius: 10px;
+        }
+
+        .detail-info h2 {
+            margin-bottom: 10px;
+            color: var(--primary-color);
+        }
+
+        .episode-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .episode-btn {
+            background-color: #333;
+            color: white;
+            padding: 10px;
+            text-align: center;
+            border-radius: 5px;
+            cursor: pointer;
+            text-decoration: none;
+            transition: background 0.3s;
+        }
+
+        .episode-btn:hover {
+            background-color: var(--primary-color);
+        }
+
+        /* Player View */
+        .player-container {
+            width: 100%;
+            max-width: 900px;
+            margin: 0 auto;
+            text-align: center;
+        }
+
+        .player-container iframe {
+            width: 100%;
+            height: 500px;
+            border: none;
+            border-radius: 10px;
+            background-color: #000;
+        }
+
+        .back-btn {
+            display: inline-block;
+            margin-bottom: 20px;
+            background-color: #333;
+            padding: 8px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        /* Utility */
+        .hidden { display: none; }
+        .loader { text-align: center; padding: 50px; font-size: 20px; color: var(--primary-color); }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1 onclick="loadHome()">AnimeStream</h1>
+        <div class="search-container">
+            <input type="text" id="searchInput" placeholder="Cari anime...">
+            <button onclick="searchAnime()">Cari</button>
+        </div>
+    </header>
+
+    <main>
+        <div id="loader" class="loader hidden">Memuat Data...</div>
+        
+        <div id="homeView">
+            <h2 class="section-title" id="homeTitle">Anime Sedang Tayang</h2>
+            <div class="anime-grid" id="animeGrid"></div>
+        </div>
+
+        <div id="detailView" class="hidden">
+            <div class="back-btn" onclick="loadHome()">⬅ Kembali</div>
+            <div class="detail-container" id="animeDetail">
+                </div>
+            <h2 class="section-title">Daftar Episode</h2>
+            <div class="episode-list" id="episodeList">
+                </div>
+        </div>
+
+        <div id="playerView" class="hidden">
+            <div class="back-btn" id="backToDetailBtn">⬅ Kembali ke Detail</div>
+            <div class="player-container">
+                <h2 id="playerTitle" style="margin-bottom: 15px;">Judul Episode</h2>
+                <div id="videoContainer">
+                    </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        /* --- JavaScript (Logic & API Fetch) --- */
+        const BASE_URL = 'https://www.sankavollerei.com/anime';
+        
+        // Element References
+        const loader = document.getElementById('loader');
+        const homeView = document.getElementById('homeView');
+        const detailView = document.getElementById('detailView');
+        const playerView = document.getElementById('playerView');
+        const animeGrid = document.getElementById('animeGrid');
+        const homeTitle = document.getElementById('homeTitle');
+
+        // State untuk tombol kembali
+        let currentAnimeSlug = '';
+
+        // Fungsi Tampilkan/Sembunyikan Loading
+        function showLoader(show) {
+            loader.classList.toggle('hidden', !show);
+        }
+
+        // Fungsi Tampilkan View Tertentu
+        function showView(viewId) {
+            homeView.classList.add('hidden');
+            detailView.classList.add('hidden');
+            playerView.classList.add('hidden');
+            document.getElementById(viewId).classList.remove('hidden');
+        }
+
+        // 1. Load Halaman Utama (Ongoing Anime)
+        async function loadHome() {
+            showView('homeView');
+            showLoader(true);
+            animeGrid.innerHTML = '';
+            homeTitle.innerText = "Anime Sedang Tayang";
+            
+            try {
+                const response = await fetch(`${BASE_URL}/ongoing-anime`);
+                const result = await response.json();
+                
+                // CATATAN: Struktur object 'result' bisa berbeda tergantung respon asli API.
+                // Asumsi standar API biasanya melempar { status: true, data: [...] }
+                const animeData = result.data || result; 
+                renderGrid(animeData);
+            } catch (error) {
+                animeGrid.innerHTML = '<p>Gagal memuat data. Periksa koneksi atau API.</p>';
+            } finally {
+                showLoader(false);
+            }
+        }
+
+        // 2. Pencarian Anime
+        async function searchAnime() {
+            const keyword = document.getElementById('searchInput').value.trim();
+            if (!keyword) return;
+
+            showView('homeView');
+            showLoader(true);
+            animeGrid.innerHTML = '';
+            homeTitle.innerText = `Hasil Pencarian: "${keyword}"`;
+
+            try {
+                const response = await fetch(`${BASE_URL}/search/${encodeURIComponent(keyword)}`);
+                const result = await response.json();
+                const animeData = result.data || result;
+                renderGrid(animeData);
+            } catch (error) {
+                animeGrid.innerHTML = '<p>Gagal melakukan pencarian.</p>';
+            } finally {
+                showLoader(false);
+            }
+        }
+
+        // Render Grid Anime (Untuk Home & Search)
+        function renderGrid(dataList) {
+            if (!dataList || dataList.length === 0) {
+                animeGrid.innerHTML = '<p>Anime tidak ditemukan.</p>';
+                return;
+            }
+
+            animeGrid.innerHTML = dataList.map(anime => `
+                <div class="anime-card" onclick="loadDetail('${anime.slug || anime.endpoint}')">
+                    <img src="${anime.poster || anime.thumb || 'https://via.placeholder.com/200x300?text=No+Image'}" alt="${anime.title}">
+                    <div class="anime-info">
+                        <h3>${anime.title}</h3>
+                        <p style="font-size: 12px; color: var(--text-muted);">${anime.status || anime.episode || ''}</p>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // 3. Load Detail Anime
+        async function loadDetail(slug) {
+            if(!slug) return;
+            
+            currentAnimeSlug = slug; // Simpan untuk tombol kembali dari player
+            showView('detailView');
+            showLoader(true);
+            
+            const detailContainer = document.getElementById('animeDetail');
+            const episodeList = document.getElementById('episodeList');
+            detailContainer.innerHTML = '';
+            episodeList.innerHTML = '';
+
+            try {
+                // Hapus awalan '/' jika ada di slug API
+                const cleanSlug = slug.replace(/^\//, ''); 
+                const response = await fetch(`${BASE_URL}/anime/${cleanSlug}`);
+                const result = await response.json();
+                const anime = result.data || result;
+
+                detailContainer.innerHTML = `
+                    <div class="detail-poster">
+                        <img src="${anime.poster || anime.thumb}" alt="${anime.title}">
+                    </div>
+                    <div class="detail-info">
+                        <h2>${anime.title}</h2>
+                        <p><strong>Status:</strong> ${anime.status || '-'}</p>
+                        <p><strong>Genre:</strong> ${anime.genre || '-'}</p>
+                        <p><strong>Rating:</strong> ${anime.rating || '-'}</p>
+                        <br>
+                        <p><strong>Sinopsis:</strong><br>${anime.synopsis || anime.deskripsi || 'Tidak ada sinopsis.'}</p>
+                    </div>
+                `;
+
+                // Render Episodes
+                const episodes = anime.episodes || anime.episode_list || [];
+                if (episodes.length > 0) {
+                    episodeList.innerHTML = episodes.map(ep => `
+                        <div class="episode-btn" onclick="loadPlayer('${ep.slug || ep.endpoint}', '${ep.title}')">
+                            ${ep.title || ep.episode}
+                        </div>
+                    `).join('');
+                } else {
+                    episodeList.innerHTML = '<p>Belum ada episode.</p>';
+                }
+
+            } catch (error) {
+                detailContainer.innerHTML = '<p>Gagal memuat detail anime.</p>';
+            } finally {
+                showLoader(false);
+            }
+        }
+
+        // 4. Load Player (Nonton Episode)
+        async function loadPlayer(slug, title) {
+            if(!slug) return;
+            
+            showView('playerView');
+            showLoader(true);
+            
+            const videoContainer = document.getElementById('videoContainer');
+            const playerTitle = document.getElementById('playerTitle');
+            videoContainer.innerHTML = '';
+            playerTitle.innerText = title || "Memuat Episode...";
+
+            document.getElementById('backToDetailBtn').onclick = () => loadDetail(currentAnimeSlug);
+
+            try {
+                const cleanSlug = slug.replace(/^\//, '');
+                const response = await fetch(`${BASE_URL}/episode/${cleanSlug}`);
+                const result = await response.json();
+                const episodeData = result.data || result;
+
+                // Cek apakah API memberikan link iframe (embed) atau link streaming langsung
+                const streamUrl = episodeData.stream_url || episodeData.iframe || episodeData.videoUrl;
+
+                if (streamUrl) {
+                    videoContainer.innerHTML = `<iframe src="${streamUrl}" allowfullscreen="true" scrolling="no"></iframe>`;
+                } else {
+                    videoContainer.innerHTML = '<p>Video tidak tersedia / tidak didukung di web ini.</p>';
+                }
+
+            } catch (error) {
+                videoContainer.innerHTML = '<p>Gagal memuat video.</p>';
+            } finally {
+                showLoader(false);
+            }
+        }
+
+        // Fitur cari via tombol "Enter"
+        document.getElementById('searchInput').addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') {
+                searchAnime();
+            }
+        });
+
+        // Load Home saat pertama kali dibuka
+        window.onload = loadHome;
+    </script>
+</body>
+</html>
